@@ -95,11 +95,11 @@ jobs:
     # Only run for comments on pull requests, by the user and starts with /test-ami
     if: ${{ github.event_name == 'workflow_dispatch' || (github.event.issue.pull_request && github.actor != 'github-actions[bot]' && startsWith(github.event.comment.body, '/test-ami')) }}
     steps:
-
       - name: Checkout base branch
         uses: actions/checkout@v4
         with:
           ref: ${{ github.event.pull_request.base.ref }}
+          
 
       - name: Display Comment/Dispatch Info
         run: |
