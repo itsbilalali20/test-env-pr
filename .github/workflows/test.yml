@@ -117,7 +117,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
-          ref: SC-917-backup
+          ref: test-2
 
       - name: Extract Distribution and Version from Comment
         if: contains(github.event.comment.body, '/build-ami')
