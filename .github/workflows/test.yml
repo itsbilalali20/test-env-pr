@@ -92,8 +92,8 @@ jobs:
     
   display-info:
     runs-on: ubuntu-latest
-    # Only run for comments on pull requests, by the user and starts with /run-tf
-    if: ${{ github.event_name == 'workflow_dispatch' || (github.event.issue.pull_request && github.actor != 'github-actions[bot]' && startsWith(github.event.comment.body, '/run-tf')) }}
+    # Only run for comments on pull requests, by the user and starts with /test-ami
+    if: ${{ github.event_name == 'workflow_dispatch' || (github.event.issue.pull_request && github.actor != 'github-actions[bot]' && startsWith(github.event.comment.body, '/test-ami')) }}
     steps:
 
       - name: Checkout base branch
@@ -152,14 +152,14 @@ jobs:
             echo "PORT2: ${PORT2}"
             echo "PARTITION: ${PARTITION}"
           fi
-          
+
 
       - name: Sleep
         run: sleep 60
 
       - name: Add simple comment to PR
         uses: actions/github-script@v6
-        if: ${{ github.event.issue.pull_request && github.actor != 'github-actions[bot]' && startsWith(github.event.comment.body, '/run-tf') }}
+        if: ${{ github.event.issue.pull_request && github.actor != 'github-actions[bot]' && startsWith(github.event.comment.body, '/test-ami') }}
         with:
           github-token: ${{ secrets.TOKEN_GH }}
           script: |
