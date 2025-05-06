@@ -1,5 +1,8 @@
-name: AMI Hardening
+name: Hello World on PR Comment and Dispatch
+
 on:
+  issue_comment:
+    types: [created]
   workflow_dispatch:
     inputs:
       AWS_ACCOUNT:
@@ -10,7 +13,7 @@ on:
           - DEV
           - PROD
       AWS_REGION:
-        description: 'Select Region for AMI'
+        description: "Select Region for AMI"
         required: true
         type: choice
         options:
@@ -32,7 +35,7 @@ on:
           - sa-east-1
           - me-central-1
       DISTRIBUTION:
-        description: 'Select Distribution for AMI'
+        description: "Select Distribution for AMI"
         required: true
         type: choice
         options:
@@ -44,16 +47,16 @@ on:
           - debian
           - ubuntu
       VERSION:
-        description: 'Major Release Version for Distribution. ECS/EKS -> LEAVE BLANK, amazonLinux -> 2/2023, RedHat -> 9,CentOS -> 7/8/9, Debian -> 10/11/12, Ubuntu -> 18/20/22'
+        description: "Major Release Version for Distribution. ECS/EKS -> LEAVE BLANK, amazonLinux -> 2/2023, RedHat -> 9,CentOS -> 7/8/9, Debian -> 10/11/12, Ubuntu -> 18/20/22"
         required: false
         type: string
       AMI_PREFIX:
-        description: 'Modify Prefix - AMI Naming Convention'
+        description: "Modify Prefix - AMI Naming Convention"
         required: true
         type: string
         default: scaleops
       FIREWALL:
-        description: 'Firewall to Setup for the AMI'
+        description: "Firewall to Setup for the AMI"
         required: true
         type: choice
         options:
@@ -61,91 +64,66 @@ on:
           - firewalld
           - ufw
       OPENPORTS:
-        description: 'Open Custom Ports for Services? (Check for Yes) 80,443 are already open by default'
+        description: "Open Custom Ports for Services? (Check for Yes) 80,443 are already open by default"
         required: false
         type: boolean
         default: false
       PORT1:
-        description: 'Open a Custom Port for Services'
+        description: "Open a Custom Port for Services"
         required: false
         type: string
       PORT2:
-        description: 'Open a Custom Port for Services'
+        description: "Open a Custom Port for Services"
         required: false
         type: string
       PARTITION:
-        description: 'Create Partitions? (check for yes)'
+        description: "Create Partitions? (check for yes)"
         required: true
         type: boolean
         default: false
 
-  issue_comment:
-    types: [created]
-
 permissions:
+  pull-requests: write
   id-token: write
-  contents: read
-  pull-requests: read
   issues: write
-
-env:
-  AWS_OIDC_ROLE: >-
-    ${{ fromJson('{ "DEV": "arn:aws:iam::059516066038:role/githubactions_oidc","PROD": "arn:aws:iam::682624655763:role/prod_githubactions_oidc"}')[github.event.inputs.AWS_ACCOUNT] }}
-  AWS_CONTROL_ACCOUNT_ID: >-
-    ${{ fromJson('{ "DEV": "059516066038","PROD": "682624655763"}')[github.event.inputs.AWS_ACCOUNT] }}
-  AMI_PREFIX: ${{ github.event.inputs.AMI_PREFIX }}
-  TF_FOLDER: >-
-    ${{ fromJson('{ "amazonLinux": "templates/EC2","RedHat": "templates/EC2","CentOS": "templates/EC2","debian": "templates/EC2","ubuntu": "templates/EC2","ECS": "templates/ECS","EKS": "templates/EKS"}')[github.event.inputs.DISTRIBUTION] }}
-  AWS_REGION: ${{ github.event.inputs.AWS_REGION }}
-  DISTRIBUTION: ${{ github.event.inputs.DISTRIBUTION }}
-  VERSION: ${{ github.event.inputs.VERSION }}
-  FIREWALL: ${{ github.event.inputs.FIREWALL }}
-  OPENPORTS: ${{ github.event.inputs.OPENPORTS }}
-  PARTITION: ${{ github.event.inputs.PARTITION }}
-  PORT1: ${{ github.event.inputs.PORT1 }}
-  PORT2: ${{ github.event.inputs.PORT2 }}
+  contents: read
 
 jobs:
-  display_envs:
+  display-info:
     runs-on: ubuntu-latest
+    # Only run for comments on pull requests, by the user and starts with /run-tf
+    if: ${{ github.event_name == 'workflow_dispatch' || (github.event.issue.pull_request && github.actor != 'github-actions[bot]' && startsWith(github.event.comment.body, '/run-tf')) }}
     steps:
-      - name: Get PR branch
-        uses: xt0rted/pull-request-comment-branch@v1
-        id: comment-branch
-
-      - name: Checkout PR branch
-        uses: actions/checkout@v3
-        with:
-          ref: ${{ steps.comment-branch.outputs.head_ref }}
-
-      - name: Extract Distribution and Version from Comment
-        id: parse_comment
+      - name: Display Comment/Dispatch Info
         run: |
-          COMMENT="${{ github.event.comment.body }}"
-          if [[ "$COMMENT" =~ '/build-ami\s+(.*)' ]]; then
-            BUILD_ARGS="${BASH_REMATCH[1]}"
-            IFS=' ' read -r DISTRIBUTION VERSION <<< "$BUILD_ARGS"
-            echo "DISTRIBUTION=$DISTRIBUTION" >> "$GITHUB_ENV"
-            echo "VERSION=$VERSION" >> "$GITHUB_ENV"
-          else
-            echo "No valid '/build-ami' command found in the comment."
-            exit 1
+          echo "Triggered by: ${{ github.event_name }}"
+          if ${{ github.event_name == 'workflow_dispatch' }}; then
+            echo "AWS_ACCOUNT: ${{ github.event.inputs.AWS_ACCOUNT }}"
+            echo "AWS_REGION: ${{ github.event.inputs.AWS_REGION }}"
+            echo "DISTRIBUTION: ${{ github.event.inputs.DISTRIBUTION }}"
+            echo "VERSION: ${{ github.event.inputs.VERSION }}"
+            echo "AMI_PREFIX: ${{ github.event.inputs.AMI_PREFIX }}"
+            echo "FIREWALL: ${{ github.event.inputs.FIREWALL }}"
+            echo "OPENPORTS: ${{ github.event.inputs.OPENPORTS }}"
+            echo "PORT1: ${{ github.event.inputs.PORT1 }}"
+            echo "PORT2: ${{ github.event.inputs.PORT2 }}"
+            echo "PARTITION: ${{ github.event.inputs.PARTITION }}"
+          elif ${{ github.event_name == 'issue_comment' }}; then
+            echo "Comment: ${{ github.event.comment.body }}"
           fi
 
-      - name: Display Environment Variables
-        run: |
-          echo "--- Environment Variables (Trigger: ${{ github.event_name }}) ---"
-          echo "AWS_ACCOUNT: ${{ env.AWS_ACCOUNT }}"
-          echo "AWS_REGION: ${{ env.AWS_REGION }}"
-          echo "DISTRIBUTION: ${{ env.DISTRIBUTION }}"
-          echo "VERSION: ${{ env.VERSION }}"
-          echo "AMI_PREFIX: ${{ env.AMI_PREFIX }}"
-          echo "FIREWALL: ${{ env.FIREWALL }}"
-          echo "OPENPORTS: ${{ env.OPENPORTS }}"
-          echo "PORT1: ${{ env.PORT1 }}"
-          echo "PORT2: ${{ env.PORT2 }}"
-          echo "PARTITION: ${{ env.PARTITION }}"
-          echo "AWS_OIDC_ROLE: ${{ env.AWS_OIDC_ROLE }}"
-          echo "AWS_CONTROL_ACCOUNT_ID: ${{ env.AWS_CONTROL_ACCOUNT_ID }}"
-          echo "TF_FOLDER: ${{ env.TF_FOLDER }}"
-          # The PAT has been removed
+      - name: Sleep
+        run: sleep 60
+
+      - name: Add simple comment to PR
+        uses: actions/github-script@v6
+        if: ${{ github.event.issue.pull_request && github.actor != 'github-actions[bot]' && startsWith(github.event.comment.body, '/run-tf') }}
+        with:
+          github-token: ${{ secrets.TOKEN_GH }}
+          script: |
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: '✅ Terraform plan completed! Review the plan output above.'
+            })
