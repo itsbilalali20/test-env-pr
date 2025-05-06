@@ -1,0 +1,151 @@
+name: AMI Hardening
+on:
+  workflow_dispatch:
+    inputs:
+      AWS_ACCOUNT:
+        description: "Select AWS Account for AMI"
+        required: true
+        type: choice
+        options:
+          - DEV
+          - PROD
+      AWS_REGION:
+        description: 'Select Region for AMI'
+        required: true
+        type: choice
+        options:
+          - us-east-1
+          - us-east-2
+          - us-west-1
+          - us-west-2
+          - ap-south-1
+          - ap-northeast-3
+          - ap-northeast-2
+          - ap-southeast-1
+          - ap-southeast-2
+          - ca-central-1
+          - eu-central-1
+          - eu-west-1
+          - eu-west-2
+          - eu-west-3
+          - eu-north-1
+          - sa-east-1
+          - me-central-1
+      DISTRIBUTION:
+        description: 'Select Distribution for AMI'
+        required: true
+        type: choice
+        options:
+          - ECS
+          - EKS
+          - amazonLinux
+          - RedHat
+          - CentOS
+          - debian
+          - ubuntu
+      VERSION:
+        description: 'Major Release Version for Distribution. ECS/EKS -> LEAVE BLANK, amazonLinux -> 2/2023, RedHat -> 9,CentOS -> 7/8/9, Debian -> 10/11/12, Ubuntu -> 18/20/22'
+        required: false
+        type: string
+      AMI_PREFIX:
+        description: 'Modify Prefix - AMI Naming Convention'
+        required: true
+        type: string
+        default: scaleops
+      FIREWALL:
+        description: 'Firewall to Setup for the AMI'
+        required: true
+        type: choice
+        options:
+          - iptables
+          - firewalld
+          - ufw
+      OPENPORTS:
+        description: 'Open Custom Ports for Services? (Check for Yes) 80,443 are already open by default'
+        required: false
+        type: boolean
+        default: false
+      PORT1:
+        description: 'Open a Custom Port for Services'
+        required: false
+        type: string
+      PORT2:
+        description: 'Open a Custom Port for Services'
+        required: false
+        type: string
+      PARTITION:
+        description: 'Create Partitions? (check for yes)'
+        required: true
+        type: boolean
+        default: false
+
+  issue_comment:
+    types: [created]
+
+permissions:
+  id-token: write
+  contents: read
+  pull-requests: read
+  issues: write
+
+env:
+  AWS_OIDC_ROLE: >-
+    ${{ fromJson('{ "DEV": "arn:aws:iam::059516066038:role/githubactions_oidc","PROD": "arn:aws:iam::682624655763:role/prod_githubactions_oidc"}')[github.event.inputs.AWS_ACCOUNT] }}
+  AWS_CONTROL_ACCOUNT_ID: >-
+    ${{ fromJson('{ "DEV": "059516066038","PROD": "682624655763"}')[github.event.inputs.AWS_ACCOUNT] }}
+  AMI_PREFIX: ${{ github.event.inputs.AMI_PREFIX }}
+  TF_FOLDER: >-
+    ${{ fromJson('{ "amazonLinux": "templates/EC2","RedHat": "templates/EC2","CentOS": "templates/EC2","debian": "templates/EC2","ubuntu": "templates/EC2","ECS": "templates/ECS","EKS": "templates/EKS"}')[github.event.inputs.DISTRIBUTION] }}
+  AWS_REGION: ${{ github.event.inputs.AWS_REGION }}
+  DISTRIBUTION: ${{ github.event.inputs.DISTRIBUTION }}
+  VERSION: ${{ github.event.inputs.VERSION }}
+  FIREWALL: ${{ github.event.inputs.FIREWALL }}
+  OPENPORTS: ${{ github.event.inputs.OPENPORTS }}
+  PARTITION: ${{ github.event.inputs.PARTITION }}
+  PORT1: ${{ github.event.inputs.PORT1 }}
+  PORT2: ${{ github.event.inputs.PORT2 }}
+
+jobs:
+  display_envs:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Get PR branch
+        uses: xt0rted/pull-request-comment-branch@v1
+        id: comment-branch
+
+      - name: Checkout PR branch
+        uses: actions/checkout@v3
+        with:
+          ref: ${{ steps.comment-branch.outputs.head_ref }}
+
+      - name: Extract Distribution and Version from Comment
+        id: parse_comment
+        run: |
+          COMMENT="${{ github.event.comment.body }}"
+          if [[ "$COMMENT" =~ '/build-ami\s+(.*)' ]]; then
+            BUILD_ARGS="${BASH_REMATCH[1]}"
+            IFS=' ' read -r DISTRIBUTION VERSION <<< "$BUILD_ARGS"
+            echo "DISTRIBUTION=$DISTRIBUTION" >> "$GITHUB_ENV"
+            echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+          else
+            echo "No valid '/build-ami' command found in the comment."
+            exit 1
+          fi
+
+      - name: Display Environment Variables
+        run: |
+          echo "--- Environment Variables (Trigger: ${{ github.event_name }}) ---"
+          echo "AWS_ACCOUNT: ${{ env.AWS_ACCOUNT }}"
+          echo "AWS_REGION: ${{ env.AWS_REGION }}"
+          echo "DISTRIBUTION: ${{ env.DISTRIBUTION }}"
+          echo "VERSION: ${{ env.VERSION }}"
+          echo "AMI_PREFIX: ${{ env.AMI_PREFIX }}"
+          echo "FIREWALL: ${{ env.FIREWALL }}"
+          echo "OPENPORTS: ${{ env.OPENPORTS }}"
+          echo "PORT1: ${{ env.PORT1 }}"
+          echo "PORT2: ${{ env.PORT2 }}"
+          echo "PARTITION: ${{ env.PARTITION }}"
+          echo "AWS_OIDC_ROLE: ${{ env.AWS_OIDC_ROLE }}"
+          echo "AWS_CONTROL_ACCOUNT_ID: ${{ env.AWS_CONTROL_ACCOUNT_ID }}"
+          echo "TF_FOLDER: ${{ env.TF_FOLDER }}"
+          # The PAT has been removed
