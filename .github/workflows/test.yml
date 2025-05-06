@@ -78,9 +78,13 @@ on:
         required: true
         type: boolean
         default: false
-
-  issue_comment:
+  pull_request:
+    types: [opened, synchronize, reopened] # These actions relate to the PR itself
+  pull_request_target:
+    types: [labeled, synchronize, closed, assigned] # Use with caution for security reasons
+  issue_comment: # This will now only trigger on *issues*
     types: [created]
+
 
 permissions:
   id-token: write
@@ -107,18 +111,16 @@ env:
 
 jobs:
   display_envs:
+    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'issue_comment' && contains(github.event.comment.body, '/build-ami'))
     runs-on: ubuntu-latest
     steps:
-      - name: Get PR branch
-        uses: xt0rted/pull-request-comment-branch@v1
-        id: comment-branch
-
-      - name: Checkout PR branch
-        uses: actions/checkout@v3
+      - name: Checkout code
+        uses: actions/checkout@v4
         with:
-          ref: ${{ steps.comment-branch.outputs.head_ref }}
+          ref: SC-917-backup
 
       - name: Extract Distribution and Version from Comment
+        if: contains(github.event.comment.body, '/build-ami')
         id: parse_comment
         run: |
           COMMENT="${{ github.event.comment.body }}"
@@ -148,4 +150,27 @@ jobs:
           echo "AWS_OIDC_ROLE: ${{ env.AWS_OIDC_ROLE }}"
           echo "AWS_CONTROL_ACCOUNT_ID: ${{ env.AWS_CONTROL_ACCOUNT_ID }}"
           echo "TF_FOLDER: ${{ env.TF_FOLDER }}"
-          # The PAT has been removed
+          # The PAT has been removed!
+
+      - name: Add Comment on Pull Request (Comment Trigger)
+        if: github.event_name == 'issue_comment' && contains(github.event.comment.body, '/build-ami')
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const output = `Environment variables when triggered by comment:
+            AWS_ACCOUNT: ${{ env.AWS_ACCOUNT }}
+            AWS_REGION: ${{ env.AWS_REGION }}
+            DISTRIBUTION: ${{ env.DISTRIBUTION }}
+            VERSION: ${{ env.VERSION }}
+            AMI_PREFIX: ${{ env.AMI_PREFIX }}
+            FIREWALL: ${{ env.FIREWALL }}
+            OPENPORTS: ${{ env.OPENPORTS }} (Custom Ports: ${{ env.PORT1 }}, ${{ env.PORT2 }})
+            PARTITION: ${{ env.PARTITION }}
+            `;
+            github.rest.issues.createComment({
+              issue_number: context.payload.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: output
+            });
