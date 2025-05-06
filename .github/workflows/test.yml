@@ -100,7 +100,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           ref: ${{ github.event.pull_request.base.ref }}
-          
+
       - name: Display Comment/Dispatch Info
         run: |
           echo "Triggered by: ${{ github.event_name }}"
@@ -152,6 +152,7 @@ jobs:
             echo "PORT2: ${PORT2}"
             echo "PARTITION: ${PARTITION}"
           fi
+          
 
       - name: Sleep
         run: sleep 60
