@@ -110,9 +110,42 @@ jobs:
             echo "PARTITION: ${{ github.event.inputs.PARTITION }}"
           elif ${{ github.event_name == 'issue_comment' }}; then
             echo "Comment: ${{ github.event.comment.body }}"
+            COMMENT_TEXT="${{ github.event.comment.body }}"
+            # Default values
+            AWS_ACCOUNT="DEV"
+            AWS_REGION="us-east-1"
+            AMI_PREFIX="test-scaleops"
+            FIREWALL="iptables"
+            PARTITION=""
+            OPENPORTS=""
+            PORT1=""
+            PORT2=""
+
+            # Parse comment for distribution and version
+            IFS=' ' read -r -a COMMENT_PARTS <<< "$COMMENT_TEXT"
+            if [[ ${#COMMENT_PARTS[@]} -gt 1 ]]; then
+              DISTRIBUTION="${COMMENT_PARTS[1]}"
+              if [[ ${#COMMENT_PARTS[@]} -gt 2 ]]; then
+                VERSION="${COMMENT_PARTS[2]}"
+              else
+                VERSION=""
+              fi
+            else
+              DISTRIBUTION=""
+              VERSION =""
+            fi
+            echo "AWS_ACCOUNT: ${AWS_ACCOUNT}"
+            echo "AWS_REGION: ${AWS_REGION}"
+            echo "DISTRIBUTION: ${DISTRIBUTION}"
+            echo "VERSION: ${VERSION}"
+            echo "AMI_PREFIX: ${AMI_PREFIX}"
+            echo "FIREWALL: ${FIREWALL}"
+            echo "OPENPORTS: ${OPENPORTS}"
+            echo "PORT1: ${PORT1}"
+            echo "PORT2: ${PORT2}"
+            echo "PARTITION: ${PARTITION}"
           fi
 
-          
       - name: Sleep
         run: sleep 60
 
